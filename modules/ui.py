@@ -28,6 +28,9 @@ from modules.utilities import (
 from modules.video_capture import VideoCapturer
 from modules.gettext import LanguageManager
 import platform
+from skimage.io import imread, imsave
+from skimage import exposure
+from skimage.exposure import match_histograms
 
 if platform.system() == "Windows":
     from pygrabber.dshow_graph import FilterGraph
@@ -41,8 +44,8 @@ ROOT_WIDTH = 600
 PREVIEW = None
 PREVIEW_MAX_HEIGHT = 700
 PREVIEW_MAX_WIDTH = 1200
-PREVIEW_DEFAULT_WIDTH = 960
-PREVIEW_DEFAULT_HEIGHT = 540
+PREVIEW_DEFAULT_WIDTH = 960 #instrad of 960
+PREVIEW_DEFAULT_HEIGHT = 540 #instead of 540
 
 POPUP_WIDTH = 750
 POPUP_HEIGHT = 810
@@ -868,11 +871,15 @@ def get_available_cameras():
         return camera_indices, camera_names
 
 
+
+
+
+
 def create_webcam_preview(camera_index: int):
     global preview_label, PREVIEW
 
     cap = VideoCapturer(camera_index)
-    if not cap.start(PREVIEW_DEFAULT_WIDTH, PREVIEW_DEFAULT_HEIGHT, 60):
+    if not cap.start(PREVIEW_DEFAULT_WIDTH, PREVIEW_DEFAULT_HEIGHT, 120):
         update_status("Failed to start camera")
         return
 
@@ -880,17 +887,15 @@ def create_webcam_preview(camera_index: int):
     PREVIEW.deiconify()
 
     frame_processors = get_frame_processors_modules(modules.globals.frame_processors)
-    source_image = None
     prev_time = time.time()
     fps_update_interval = 0.5
     frame_count = 0
     fps = 0
 
     while True:
-        ret, frame = cap.read()
+        ret, frame = cap.read()        
         if not ret:
             break
-
         temp_frame = frame.copy()
 
         if modules.globals.live_mirror:
@@ -900,22 +905,22 @@ def create_webcam_preview(camera_index: int):
             temp_frame = fit_image_to_size(
                 temp_frame, PREVIEW.winfo_width(), PREVIEW.winfo_height()
             )
+            frame = fit_image_to_size(frame, PREVIEW.winfo_width(), PREVIEW.winfo_height())  
+
 
         else:
             temp_frame = fit_image_to_size(
                 temp_frame, PREVIEW.winfo_width(), PREVIEW.winfo_height()
             )
+            frame = fit_image_to_size(frame, PREVIEW.winfo_width(), PREVIEW.winfo_height())  
 
         if not modules.globals.map_faces:
-            if source_image is None and modules.globals.source_path:
-                source_image = get_one_face(cv2.imread(modules.globals.source_path))
-
             for frame_processor in frame_processors:
                 if frame_processor.NAME == "DLC.FACE-ENHANCER":
                     if modules.globals.fp_ui["face_enhancer"]:
-                        temp_frame = frame_processor.process_frame(None, temp_frame)
+                        temp_frame, target_face = frame_processor.process_frame(None, temp_frame)
                 else:
-                    temp_frame = frame_processor.process_frame(source_image, temp_frame)
+                    temp_frame, target_face = frame_processor.process_frame(None, temp_frame)
         else:
             modules.globals.target_path = None
             for frame_processor in frame_processors:
@@ -944,6 +949,43 @@ def create_webcam_preview(camera_index: int):
                 2,
             )
 
+        if target_face:
+
+            blur_weight = 3
+            face_coords = target_face["bbox"]
+            cur_preview_height, cur_preview_width = temp_frame.shape[:2]
+              
+            temp_frame[:round(face_coords[1]), :cur_preview_width] = frame[:round(face_coords[1]), :cur_preview_width]
+            temp_frame[:cur_preview_height, :round(face_coords[0])] = frame[:cur_preview_height, :round(face_coords[0])]
+            temp_frame[:cur_preview_height, round(face_coords[2]):cur_preview_width] = frame[:cur_preview_height, round(face_coords[2]):cur_preview_width]
+            temp_frame[round(face_coords[3]):cur_preview_height, :cur_preview_width] = frame[round(face_coords[3]):cur_preview_height, :cur_preview_width]
+                
+
+            cur_preview_height, cur_preview_width = temp_frame.shape[:2]
+
+            if round(face_coords[1]):
+                top_shelf = temp_frame[:round(face_coords[1]), :cur_preview_width]
+                blurred_top_shelf = cv2.GaussianBlur(top_shelf, (blur_weight, blur_weight), 0)
+                temp_frame[:round(face_coords[1]), :cur_preview_width]  = blurred_top_shelf
+            if round(face_coords[0]):
+                left_shelf = temp_frame[:cur_preview_height, :round(face_coords[0])]
+                blurred_left_shelf = cv2.GaussianBlur(left_shelf, (blur_weight, blur_weight), 0)
+                temp_frame[:cur_preview_height, :round(face_coords[0])] = blurred_left_shelf
+
+            if round(face_coords[2])<cur_preview_width:
+                right_shelf = temp_frame[:cur_preview_height, round(face_coords[2]):cur_preview_width]
+                blurred_right_shelf = cv2.GaussianBlur(right_shelf, (blur_weight, blur_weight), 0)
+                temp_frame[:cur_preview_height, round(face_coords[2]):cur_preview_width] = blurred_right_shelf
+
+            if round(face_coords[3])<cur_preview_height:
+                bottom_shelf = temp_frame[round(face_coords[3]):cur_preview_height, :cur_preview_width]
+                blurred_bottom_shelf = cv2.GaussianBlur(bottom_shelf, (blur_weight, blur_weight), 0)
+                temp_frame[round(face_coords[3]):cur_preview_height, :cur_preview_width] = blurred_bottom_shelf
+            # except Exception as e:
+            #     print(e)  # Output: division by zero
+
+
+        temp_frame = (temp_frame*0.85).astype('uint8')
         image = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)
         image = Image.fromarray(image)
         image = ImageOps.contain(

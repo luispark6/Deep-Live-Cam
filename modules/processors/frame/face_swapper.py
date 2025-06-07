@@ -35,6 +35,7 @@ def pre_check() -> bool:
             "https://huggingface.co/hacksider/deep-live-cam/blob/main/inswapper_128_fp16.onnx"
         ],
     )
+
     return True
 
 
@@ -67,9 +68,10 @@ def get_face_swapper() -> Any:
     return FACE_SWAPPER
 
 
+
+
 def swap_face(source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
     face_swapper = get_face_swapper()
-
     # Apply the face swap
     swapped_frame = face_swapper.get(
         temp_frame, target_face, source_face, paste_back=True
@@ -98,10 +100,11 @@ def swap_face(source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
     return swapped_frame
 
 
-def process_frame(source_face: Face, temp_frame: Frame) -> Frame:
+def process_frame(source_face, temp_frame: Frame) -> Frame:
+
     if modules.globals.color_correction:
         temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)
-
+    
     if modules.globals.many_faces:
         many_faces = get_many_faces(temp_frame)
         if many_faces:
@@ -112,11 +115,24 @@ def process_frame(source_face: Face, temp_frame: Frame) -> Frame:
                     print("Face detection failed for target/source.")
     else:
         target_face = get_one_face(temp_frame)
+        if target_face:
+            target_face_coords = target_face["bbox"]
+            for i in range(len(target_face_coords)):
+                if target_face_coords[i]<0: target_face_coords[i]=0
+            target_face_np = temp_frame[round(target_face_coords[1]): round(target_face_coords[3]), round(target_face_coords[0]): round(target_face_coords[2])]
+            target_face_rgb = cv2.cvtColor(target_face_np, cv2.COLOR_BGR2RGB)
+            source_image_np= cv2.imread(modules.globals.source_path)
+            source_image_rgb =  cv2.cvtColor(source_image_np, cv2.COLOR_BGR2RGB)
+
+            matched = apply_color_transfer(source_image_rgb, target_face_rgb)
+            matched_bgr = cv2.cvtColor(matched.astype('uint8'), cv2.COLOR_RGB2BGR)
+            source_face = get_one_face(matched_bgr)
         if target_face and source_face:
             temp_frame = swap_face(source_face, target_face, temp_frame)
         else:
             logging.error("Face detection failed for target or source.")
-    return temp_frame
+            return temp_frame, target_face
+    return temp_frame, target_face
 
 
 
@@ -242,7 +258,7 @@ def process_image(source_path: str, target_path: str, output_path: str) -> None:
     if not modules.globals.map_faces:
         source_face = get_one_face(cv2.imread(source_path))
         target_frame = cv2.imread(target_path)
-        result = process_frame(source_face, target_frame)
+        result, t = process_frame(source_face, target_frame)
         cv2.imwrite(output_path, result)
     else:
         if modules.globals.many_faces:
