@@ -1,4 +1,5 @@
 import os
+import torch
 import webbrowser
 import customtkinter as ctk
 from typing import Callable, Tuple
@@ -9,6 +10,7 @@ import time
 import json
 import modules.globals
 import modules.metadata
+import numpy as np
 from modules.face_analyser import (
     get_one_face,
     get_unique_faces_from_target_image,
@@ -31,6 +33,7 @@ import platform
 from skimage.io import imread, imsave
 from skimage import exposure
 from skimage.exposure import match_histograms
+from gfpgan import GFPGANer
 
 if platform.system() == "Windows":
     from pygrabber.dshow_graph import FilterGraph
@@ -877,7 +880,6 @@ def get_available_cameras():
 
 def create_webcam_preview(camera_index: int):
     global preview_label, PREVIEW
-
     cap = VideoCapturer(camera_index)
     if not cap.start(PREVIEW_DEFAULT_WIDTH, PREVIEW_DEFAULT_HEIGHT, 120):
         update_status("Failed to start camera")
@@ -891,6 +893,55 @@ def create_webcam_preview(camera_index: int):
     fps_update_interval = 0.5
     frame_count = 0
     fps = 0
+
+
+    
+
+    # if not torch.cuda.is_available():  # CPU
+    #     import warnings
+    #     bg_upsampler = None
+    # else:
+    #     print('hffdjfbskfbjkbskzdbfkbzskdbfbzsjkbfbsjzkdf')
+    #     from basicsr.archs.rrdbnet_arch import RRDBNet
+    #     from realesrgan import RealESRGANer
+    #     model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=2)
+    #     bg_upsampler = RealESRGANer(
+    #         scale=2,
+    #         model_path='https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth',
+    #         model=model,
+    #         tile=0,
+    #         tile_pad=10,
+    #         pre_pad=0,
+    #         half=True)  # need to set False in CPU mode
+
+
+    # arch = 'clean'
+    # channel_multiplier = 2
+    # model_name = 'GFPGANv1.3'
+    # url = 'https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth'
+    # # determine model paths
+    # model_path = os.path.join('experiments', 'pretrained_models', model_name + '.pth')
+    # if not os.path.isfile(model_path):
+    #     model_path = os.path.join('gfpgan/weights', model_name + '.pth')
+    # if not os.path.isfile(model_path):
+    #     # download pre-trained models from url
+    #     model_path = url
+
+    # restorer = GFPGANer(
+    #     model_path=model_path,
+    #     upscale=2,
+    #     arch=arch,
+    #     channel_multiplier=channel_multiplier,
+    #     bg_upsampler=bg_upsampler)
+
+
+    # print(restorer.device)
+
+
+
+
+
+
 
     while True:
         ret, frame = cap.read()        
@@ -938,20 +989,10 @@ def create_webcam_preview(camera_index: int):
             frame_count = 0
             prev_time = current_time
 
-        if modules.globals.show_fps:
-            cv2.putText(
-                temp_frame,
-                f"FPS: {fps:.1f}",
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 255, 0),
-                2,
-            )
 
         if target_face:
 
-            blur_weight = 3
+            blur_weight = 9
             face_coords = target_face["bbox"]
             cur_preview_height, cur_preview_width = temp_frame.shape[:2]
               
@@ -959,9 +1000,6 @@ def create_webcam_preview(camera_index: int):
             temp_frame[:cur_preview_height, :round(face_coords[0])] = frame[:cur_preview_height, :round(face_coords[0])]
             temp_frame[:cur_preview_height, round(face_coords[2]):cur_preview_width] = frame[:cur_preview_height, round(face_coords[2]):cur_preview_width]
             temp_frame[round(face_coords[3]):cur_preview_height, :cur_preview_width] = frame[round(face_coords[3]):cur_preview_height, :cur_preview_width]
-                
-
-            cur_preview_height, cur_preview_width = temp_frame.shape[:2]
 
             if round(face_coords[1]):
                 top_shelf = temp_frame[:round(face_coords[1]), :cur_preview_width]
@@ -981,11 +1019,33 @@ def create_webcam_preview(camera_index: int):
                 bottom_shelf = temp_frame[round(face_coords[3]):cur_preview_height, :cur_preview_width]
                 blurred_bottom_shelf = cv2.GaussianBlur(bottom_shelf, (blur_weight, blur_weight), 0)
                 temp_frame[round(face_coords[3]):cur_preview_height, :cur_preview_width] = blurred_bottom_shelf
-            # except Exception as e:
-            #     print(e)  # Output: division by zero
+                
+        if modules.globals.show_fps:
+            cv2.putText(
+                temp_frame,
+                f"FPS: {fps:.1f}",
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 255, 0),
+                2,
+            )
 
 
-        temp_frame = (temp_frame*0.85).astype('uint8')
+        # cropped_faces, restored_faces, restored_img = restorer.enhance(
+        #     temp_frame,
+        #     has_aligned=False,
+        #     only_center_face=False,
+        #     paste_back=True,
+        #     weight=0.5)
+
+        # face_region = restored_img[round(face_coords[1]): round(face_coords[3]), round(face_coords[0]): round(face_coords[2])]
+
+        # blurred =  cv2.GaussianBlur(face_region, (105, 105), 0)
+        # restored_img[round(face_coords[1]): round(face_coords[3]), round(face_coords[0]): round(face_coords[2])] = blurred
+
+
+
         image = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)
         image = Image.fromarray(image)
         image = ImageOps.contain(
