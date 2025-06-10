@@ -256,5 +256,5 @@ def run() -> None:
     if modules.globals.headless:
         start()
     else:
-        window = ui.init(start, destroy, modules.globals.lang)
+        window = ui.init(destroy, modules.globals.lang)
         window.mainloop()
