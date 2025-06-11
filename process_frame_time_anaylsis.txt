@@ -1,0 +1,44 @@
+Timer unit: 1e-07 s
+
+Total time: 13.0289 s
+File: C:\Users\Luis Park Work\Desktop\Deep-Live-Cam\modules\processors\frame\face_swapper.py
+Function: process_frame at line 104
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   104                                           @line_profiler.profile
+   105                                           def process_frame(source_face, temp_frame: Frame) -> Frame:
+   106                                           
+   107        19        337.0     17.7      0.0      if modules.globals.color_correction:
+   108                                                   temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)
+   109                                               
+   110        19        176.0      9.3      0.0      if modules.globals.many_faces:
+   111                                                   many_faces = get_many_faces(temp_frame)
+   112                                                   if many_faces:
+   113                                                       for target_face in many_faces:
+   114                                                           if source_face and target_face:
+   115                                                               temp_frame = swap_face(source_face, target_face, temp_frame)
+   116                                                           else:
+   117                                                               print("Face detection failed for target/source.")
+   118                                               else:
+   119        19   66456611.0    3e+06     51.0          target_face = get_one_face(temp_frame)
+   120        19         91.0      4.8      0.0          if target_face:
+   121        19        125.0      6.6      0.0              target_face_coords = target_face["bbox"]
+   122        95        523.0      5.5      0.0              for i in range(len(target_face_coords)):
+   123        76       2533.0     33.3      0.0                  if target_face_coords[i]<0: target_face_coords[i]=0
+   124        19       1908.0    100.4      0.0              target_face_np = temp_frame[round(target_face_coords[1]): round(target_face_coords[3]), round(target_face_coords[0]): round(target_face_coords[2])]
+   125        19       3396.0    178.7      0.0              target_face_rgb = cv2.cvtColor(target_face_np, cv2.COLOR_BGR2RGB)
+   126        19      96616.0   5085.1      0.1              source_image_np= cv2.imread(modules.globals.source_path)
+   127        19       1741.0     91.6      0.0              source_image_rgb =  cv2.cvtColor(source_image_np, cv2.COLOR_BGR2RGB)
+   128                                           
+   129        19    1381872.0  72730.1      1.1              matched = apply_color_transfer(source_image_rgb, target_face_rgb)
+   130        19       6125.0    322.4      0.0              matched_bgr = cv2.cvtColor(matched.astype('uint8'), cv2.COLOR_RGB2BGR)
+   131        19    4389279.0 231014.7      3.4              source_face = get_one_face(matched_bgr)
+   132        19         96.0      5.1      0.0          if target_face and source_face:
+   133        19   57947245.0    3e+06     44.5              temp_frame = swap_face(source_face, target_face, temp_frame)
+   134                                                   else:
+   135                                                       logging.error("Face detection failed for target or source.")
+   136                                                       return temp_frame, target_face
+   137        19        297.0     15.6      0.0      return temp_frame, target_face
+
+ 13.03 seconds - C:\Users\Luis Park Work\Desktop\Deep-Live-Cam\modules\processors\frame\face_swapper.py:104 - process_frame

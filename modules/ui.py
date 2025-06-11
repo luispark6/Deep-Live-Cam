@@ -8,14 +8,15 @@ import time
 import json
 import modules.globals
 import modules.metadata
-from modules.capturer import get_video_frame, get_video_frame_total
 from modules.processors.frame.core import get_frame_processors_modules
 from modules.utilities import (
     is_image,
-    is_video,
     resolve_relative_path,
-    has_image_extension,
 )
+
+
+
+
 from modules.video_capture import VideoCapturer
 from modules.gettext import LanguageManager
 import platform
@@ -444,7 +445,7 @@ def get_available_cameras():
 
 
 
-
+# @line_profiler.profile
 def create_webcam_preview(camera_index: int):
     global preview_label, PREVIEW
     cap = VideoCapturer(camera_index)
@@ -460,14 +461,12 @@ def create_webcam_preview(camera_index: int):
     fps_update_interval = 0.5
     frame_count = 0
     fps = 0
-
-
+    
     while True:
         ret, frame = cap.read()        
         if not ret:
             break
         temp_frame = frame.copy()
-
         if modules.globals.live_mirror:
             temp_frame = cv2.flip(temp_frame, 1)
 

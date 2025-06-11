@@ -16,6 +16,8 @@ from modules.utilities import (
 )
 from modules.cluster_analysis import find_closest_centroid
 import os
+import line_profiler
+
 
 FACE_SWAPPER = None
 THREAD_LOCK = threading.Lock()
@@ -99,7 +101,7 @@ def swap_face(source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
 
     return swapped_frame
 
-
+# @line_profiler.profile
 def process_frame(source_face, temp_frame: Frame) -> Frame:
 
     if modules.globals.color_correction:

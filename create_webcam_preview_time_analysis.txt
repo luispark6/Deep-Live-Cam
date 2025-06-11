@@ -1,0 +1,120 @@
+Timer unit: 1e-07 s
+
+Total time: 16.672 s
+File: C:\Users\Luis Park Work\Desktop\Deep-Live-Cam\modules\ui.py
+Function: create_webcam_preview at line 452
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   452                                           @line_profiler.profile
+   453                                           def create_webcam_preview(camera_index: int):
+   454                                               global preview_label, PREVIEW
+   455         1     511412.0 511412.0      0.3      cap = VideoCapturer(camera_index)
+   456         1   26686103.0    3e+07     16.0      if not cap.start(PREVIEW_DEFAULT_WIDTH, PREVIEW_DEFAULT_HEIGHT, 120):
+   457                                                   update_status("Failed to start camera")
+   458                                                   return
+   459                                           
+   460         1       8830.0   8830.0      0.0      preview_label.configure(width=PREVIEW_DEFAULT_WIDTH, height=PREVIEW_DEFAULT_HEIGHT)
+   461         1      48953.0  48953.0      0.0      PREVIEW.deiconify()
+   462                                           
+   463         1        321.0    321.0      0.0      frame_processors = get_frame_processors_modules(modules.globals.frame_processors)
+   464         1         20.0     20.0      0.0      prev_time = time.time()
+   465         1          4.0      4.0      0.0      fps_update_interval = 0.5
+   466         1          4.0      4.0      0.0      frame_count = 0
+   467         1          3.0      3.0      0.0      fps = 0
+   468                                           
+   469                                               
+   470        18         83.0      4.6      0.0      while True:
+   471                                                   
+   472        18    5217766.0 289875.9      3.1          ret, frame = cap.read()        
+   473        18        164.0      9.1      0.0          if not ret:
+   474                                                       break
+   475        18      47149.0   2619.4      0.0          temp_frame = frame.copy()
+   476        18        338.0     18.8      0.0          if modules.globals.live_mirror:
+   477                                                       temp_frame = cv2.flip(temp_frame, 1)
+   478                                           
+   479        18        100.0      5.6      0.0          if modules.globals.live_resizable:
+   480                                                       temp_frame = fit_image_to_size(
+   481                                                           temp_frame, PREVIEW.winfo_width(), PREVIEW.winfo_height()
+   482                                                       )
+   483                                                       frame = fit_image_to_size(frame, PREVIEW.winfo_width(), PREVIEW.winfo_height())  
+   484                                           
+   485                                           
+   486                                                   else:
+   487        36      87254.0   2423.7      0.1              temp_frame = fit_image_to_size(
+   488        18       1893.0    105.2      0.0                  temp_frame, PREVIEW.winfo_width(), PREVIEW.winfo_height()
+   489                                                       )
+   490        18      81126.0   4507.0      0.0              frame = fit_image_to_size(frame, PREVIEW.winfo_width(), PREVIEW.winfo_height())  
+   491                                           
+   492        36        357.0      9.9      0.0          for frame_processor in frame_processors:
+   493        18        219.0     12.2      0.0              if frame_processor.NAME == "DLC.FACE-ENHANCER":
+   494                                                           if modules.globals.fp_ui["face_enhancer"]:
+   495                                                               temp_frame, target_face = frame_processor.process_frame(None, temp_frame)
+   496                                                       else:
+   497        18  126539646.0    7e+06     75.9                  temp_frame, target_face = frame_processor.process_frame(None, temp_frame)
+   498                                           
+   499                                                   # Calculate and display FPS
+   500        18        440.0     24.4      0.0          current_time = time.time()
+   501        18        113.0      6.3      0.0          frame_count += 1
+   502        18        114.0      6.3      0.0          if current_time - prev_time >= fps_update_interval:
+   503         4         41.0     10.2      0.0              fps = frame_count / (current_time - prev_time)
+   504         4         12.0      3.0      0.0              frame_count = 0
+   505         4         12.0      3.0      0.0              prev_time = current_time
+   506                                           
+   507                                           
+   508        18         92.0      5.1      0.0          if target_face:
+   509                                           
+   510        18         43.0      2.4      0.0              blur_weight = 5
+   511        18        226.0     12.6      0.0              face_coords = target_face["bbox"]
+   512        18        192.0     10.7      0.0              cur_preview_height, cur_preview_width = temp_frame.shape[:2]
+   513                                                         
+   514        18       7546.0    419.2      0.0              temp_frame[:round(face_coords[1]), :cur_preview_width] = frame[:round(face_coords[1]), :cur_preview_width]
+   515        18      12780.0    710.0      0.0              temp_frame[:cur_preview_height, :round(face_coords[0])] = frame[:cur_preview_height, :round(face_coords[0])]
+   516        18      11971.0    665.1      0.0              temp_frame[:cur_preview_height, round(face_coords[2]):cur_preview_width] = frame[:cur_preview_height, round(face_coords[2]):cur_preview_width]
+   517        18       3518.0    195.4      0.0              temp_frame[round(face_coords[3]):cur_preview_height, :cur_preview_width] = frame[round(face_coords[3]):cur_preview_height, :cur_preview_width]
+   518                                           
+   519        18        382.0     21.2      0.0              if round(face_coords[1]):
+   520        18        331.0     18.4      0.0                  top_shelf = temp_frame[:round(face_coords[1]), :cur_preview_width]
+   521        18      13856.0    769.8      0.0                  blurred_top_shelf = cv2.GaussianBlur(top_shelf, (blur_weight, blur_weight), 0)
+   522        18       4576.0    254.2      0.0                  temp_frame[:round(face_coords[1]), :cur_preview_width]  = blurred_top_shelf
+   523        18        624.0     34.7      0.0              if round(face_coords[0]):
+   524        18        520.0     28.9      0.0                  left_shelf = temp_frame[:cur_preview_height, :round(face_coords[0])]
+   525        18      11392.0    632.9      0.0                  blurred_left_shelf = cv2.GaussianBlur(left_shelf, (blur_weight, blur_weight), 0)
+   526        18       6363.0    353.5      0.0                  temp_frame[:cur_preview_height, :round(face_coords[0])] = blurred_left_shelf
+   527                                           
+   528        18        630.0     35.0      0.0              if round(face_coords[2])<cur_preview_width:
+   529        18        512.0     28.4      0.0                  right_shelf = temp_frame[:cur_preview_height, round(face_coords[2]):cur_preview_width]
+   530        18      12610.0    700.6      0.0                  blurred_right_shelf = cv2.GaussianBlur(right_shelf, (blur_weight, blur_weight), 0)
+   531        18       7715.0    428.6      0.0                  temp_frame[:cur_preview_height, round(face_coords[2]):cur_preview_width] = blurred_right_shelf
+   532                                           
+   533        18        612.0     34.0      0.0              if round(face_coords[3])<cur_preview_height:
+   534        18      17218.0    956.6      0.0                  bottom_shelf = temp_frame[round(face_coords[3]):cur_preview_height, :cur_preview_width]
+   535        18      13308.0    739.3      0.0                  blurred_bottom_shelf = cv2.GaussianBlur(bottom_shelf, (blur_weight, blur_weight), 0)
+   536        18       6141.0    341.2      0.0                  temp_frame[round(face_coords[3]):cur_preview_height, :cur_preview_width] = blurred_bottom_shelf
+   537                                                           
+   538        18        220.0     12.2      0.0          if modules.globals.show_fps:
+   539        36       7783.0    216.2      0.0              cv2.putText(
+   540        18         70.0      3.9      0.0                  temp_frame,
+   541        18        942.0     52.3      0.0                  f"FPS: {fps:.1f}",
+   542        18         87.0      4.8      0.0                  (10, 30),
+   543        18        126.0      7.0      0.0                  cv2.FONT_HERSHEY_SIMPLEX,
+   544        18         70.0      3.9      0.0                  1,
+   545        18         64.0      3.6      0.0                  (0, 255, 0),
+   546        18         59.0      3.3      0.0                  2,
+   547                                                       )
+   548        18      32705.0   1816.9      0.0          image = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)
+   549        18     105340.0   5852.2      0.1          image = Image.fromarray(image)
+   550        36      65260.0   1812.8      0.0          image = ImageOps.contain(
+   551        18        192.0     10.7      0.0              image, (temp_frame.shape[1], temp_frame.shape[0]), Image.LANCZOS
+   552                                                   )
+   553        18       2784.0    154.7      0.0          image = ctk.CTkImage(image, size=image.size)
+   554        18     971222.0  53956.8      0.6          preview_label.configure(image=image)
+   555        18     353584.0  19643.6      0.2          ROOT.update()
+   556                                           
+   557        18       1217.0     67.6      0.0          if PREVIEW.state() == "withdrawn":
+   558         1          4.0      4.0      0.0              break
+   559                                           
+   560         1    5812428.0    6e+06      3.5      cap.release()
+   561         1        371.0    371.0      0.0      PREVIEW.withdraw()
+
+ 16.67 seconds - C:\Users\Luis Park Work\Desktop\Deep-Live-Cam\modules\ui.py:452 - create_webcam_preview
